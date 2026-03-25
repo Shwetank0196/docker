@@ -5,6 +5,44 @@ version: '3.8'
 # Define all services (containers) for our application
 services:
 
+  # MySQL Database Service
+  mysql-db:
+    # Use official MySQL 8.0 image
+    image: mysql:8.0
+
+    # Custom container name
+    container_name: student-mysql
+
+    # Environment variables for MySQL configuration
+    environment:
+      - MYSQL_ROOT_PASSWORD=root_password
+      - MYSQL_DATABASE=student_management
+      - MYSQL_USER=student_user
+      - MYSQL_PASSWORD=student_password
+
+    # Port mapping (optional, for external access)
+    # Uncomment if you want to access MySQL directly from host
+    # ports:
+    #   - "3306:3306"
+
+    # Volume for data persistence
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./mysql/init.sql:/docker-entrypoint-initdb.d/init.sql
+
+    # Restart policy
+    restart: unless-stopped
+
+    # Connect to custom network
+    networks:
+      - student-network
+
+    # Health check for MySQL readiness
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+
   # Backend API Service
   backend:
     # Build from Dockerfile in ./backend directory
@@ -18,16 +56,20 @@ services:
     ports:
       - "3000:3000"
 
-    # Volume mapping for data persistence
-    # SQLite database file persists even after container restarts
-    # Format: host_path:container_path
-    volumes:
-      - ./backend/data:/app/data
-
-    # Environment variables passed to the container
+    # Environment variables for MySQL connection
     environment:
       - NODE_ENV=development
       - PORT=3000
+      - DB_HOST=mysql-db
+      - DB_PORT=3306
+      - DB_USER=student_user
+      - DB_PASSWORD=student_password
+      - DB_NAME=student_management
+
+    # Wait for MySQL to be ready before starting backend
+    depends_on:
+      mysql-db:
+        condition: service_healthy
 
     # Restart policy: always restart unless manually stopped
     restart: unless-stopped
@@ -94,7 +136,8 @@ networks:
     # Bridge network driver (default for single host)
     driver: bridge
 
-# Define named volumes (optional, for future use)
-# Currently using bind mounts, but named volumes are better for production
+# Define named volumes for data persistence
 volumes:
-  backend-data:
+  mysql-data:
+    # Named volume for MySQL data persistence
+    driver: local

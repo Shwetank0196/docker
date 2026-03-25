@@ -6,7 +6,7 @@ A beginner-friendly Docker project that demonstrates containerization concepts t
 
 This project is designed to teach Docker fundamentals through hands-on experience. It includes a complete web application with:
 
-- **Backend API** (Node.js + Express + SQLite)
+- **Backend API** (Node.js + Express + MySQL)
 - **Frontend** (HTML + CSS + JavaScript)
 - **Reverse Proxy** (Nginx)
 - **Multi-container orchestration** (Docker Compose)
@@ -22,7 +22,7 @@ This project is designed to teach Docker fundamentals through hands-on experienc
 - 📋 View all students in a responsive table
 - ✏️ Edit student details
 - 🗑️ Delete students
-- 💾 Persistent data storage (SQLite with Docker volumes)
+- 💾 Persistent data storage (MySQL with Docker volumes)
 
 ### Learning Features
 - 🐳 Complete Docker setup with Dockerfile for each service
@@ -115,7 +115,7 @@ docker-guide-/
 │   ├── .dockerignore                  # Build exclusions
 │   ├── package.json                   # Node.js dependencies
 │   ├── server.js                      # Express server
-│   ├── database.js                    # SQLite setup
+│   ├── database.js                    # MySQL setup
 │   ├── routes/
 │   │   └── students.js               # Student API endpoints
 │   └── data/                          # Database storage (volume mount)
@@ -161,15 +161,16 @@ The application uses a **three-tier architecture** with **Nginx as a reverse pro
 │ Backend Container │            │ Frontend         │
 │ (Node.js/Express) │            │ Container        │
 │ - REST API        │            │ (Nginx)          │
-│ - SQLite database │            │ - Static files   │
+│ - MySQL database │            │ - Static files   │
 │ - Port: 3000      │            │ - Port: 80       │
-└───────────────────┘            └──────────────────┘
-        │
-        ↓ Volume mount
+└─────────┬─────────┘            └──────────────────┘
+          │
+          ↓ Port 3306
 ┌───────────────────┐
-│ ./backend/data/   │
-│ (Your Computer)   │
-│ - students.db     │
+│ MySQL Container   │
+│ - Database: MySQL │
+│ - Port: 3306      │
+│ - Persistent data │
 └───────────────────┘
 ```
 
@@ -476,7 +477,8 @@ Once you're comfortable with the basics, try these enhancements:
 - [ ] Add input validations
 
 ### Intermediate
-- [ ] Replace SQLite with PostgreSQL (learn multi-container databases)
+- [x] ✅ **Migrated to MySQL** (multi-container database setup complete!)
+- [ ] Add PostgreSQL support (learn multi-database architectures)
 - [ ] Add authentication system
 - [ ] Create separate dev/prod Docker Compose files
 - [ ] Add health checks to services

@@ -314,7 +314,7 @@ docker run -v <host-path>:<container-path> <image>
 # Mount current directory to /app in container
 docker run -v $(pwd):/app student-api
 
-# Mount data directory for SQLite database
+# Mount data directory for MySQL persistence
 docker run -v $(pwd)/data:/app/data student-api
 
 # Named volume (Docker manages the location)

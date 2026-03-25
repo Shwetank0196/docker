@@ -641,20 +641,59 @@ node_modules
 
 ## Database Issues
 
-### Issue: SQLite "database is locked"
+### Issue: MySQL connection failed
 
-**Cause:** Multiple processes accessing same database file
+**Cause:** Backend can't connect to MySQL database
 
 **Solution:**
 
-**Check only one backend instance:**
+**Check MySQL container status:**
 ```bash
-docker ps | grep backend
+docker-compose ps mysql-db
 ```
 
-**Check file permissions:**
+**Check if MySQL is ready:**
 ```bash
-ls -la backend/data/
+docker-compose logs mysql-db
+# Look for: "MySQL init process done. Ready for start up."
+```
+
+**Test MySQL connection:**
+```bash
+# Access MySQL container
+docker-compose exec mysql-db mysql -u student_user -p student_management
+# Password: student_password
+```
+
+### Issue: MySQL data lost after restart
+
+**Cause:** Named volume not properly configured
+
+**Solution:**
+
+**Check volume exists:**
+```bash
+docker volume ls | grep mysql
+```
+
+**Verify volume configuration in docker-compose.yml:**
+```yaml
+volumes:
+  mysql-data:
+    driver: local
+```
+
+### Issue: Backend shows "Connection timeout"
+
+**Cause:** Backend starts before MySQL is ready
+
+**Solution:**
+
+**Use healthcheck dependency in docker-compose.yml:**
+```yaml
+depends_on:
+  mysql-db:
+    condition: service_healthy
 ```
 
 ---

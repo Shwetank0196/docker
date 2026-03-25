@@ -12,15 +12,13 @@ app.use(cors()); // Enable CORS for all routes
 app.use(bodyParser.json()); // Parse JSON request bodies
 app.use(express.json()); // Alternative JSON parser
 
-// Initialize database
-initDatabase();
-
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.json({
     status: 'OK',
     message: 'Student Management API is running',
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    database: 'MySQL'
   });
 });
 
@@ -31,6 +29,7 @@ app.use('/students', studentRoutes);
 app.get('/', (req, res) => {
   res.json({
     message: 'Welcome to Student Management API',
+    database: 'MySQL',
     endpoints: {
       health: 'GET /health',
       students: {
@@ -53,8 +52,32 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Start server
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server is running on port ${PORT}`);
-  console.log(`Health check: http://localhost:${PORT}/health`);
-});
+// Initialize database and start server
+async function startServer() {
+  try {
+    console.log('Initializing database connection...');
+
+    // Initialize database with retry logic
+    const dbInitialized = await initDatabase();
+
+    if (!dbInitialized) {
+      console.error('Failed to initialize database. Exiting...');
+      process.exit(1);
+    }
+
+    // Start server only after database is ready
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`✅ Server is running on port ${PORT}`);
+      console.log(`✅ Database: MySQL connected successfully`);
+      console.log(`🏥 Health check: http://localhost:${PORT}/health`);
+      console.log(`📚 API docs: http://localhost:${PORT}/`);
+    });
+
+  } catch (error) {
+    console.error('Failed to start server:', error.message);
+    process.exit(1);
+  }
+}
+
+// Start the application
+startServer();

@@ -103,7 +103,7 @@ Your application runs the same everywhere - on your laptop, your friend's comput
 Each container is isolated. If one crashes, others keep running.
 
 ### 3. Easy Setup
-Instead of telling someone: "Install Node.js version 18, then SQLite, then run these 10 commands..."
+Instead of telling someone: "Install Node.js version 18, MySQL, then run these 10 commands..."
 
 You just say: "Run `docker-compose up`"
 
@@ -166,7 +166,7 @@ In our Student Management System:
 
 1. **Backend Container**
    - Runs Node.js and Express
-   - Stores data in SQLite database
+   - Stores data in MySQL database
    - Listens on port 3000
 
 2. **Frontend Container**
@@ -184,7 +184,7 @@ In our Student Management System:
    - They use service names (backend, frontend, nginx)
 
 5. **Volume**
-   - SQLite database file is stored on your computer
+   - MySQL database data is persistently stored
    - Data persists even if you stop containers
 
 ## The Docker Workflow
@@ -245,7 +245,7 @@ Docker Container:
 **A:** No! That's the beauty of Docker. Node.js is inside the container. Your computer only needs Docker.
 
 ### Q: What happens to my data when I stop a container?
-**A:** Without volumes, data is lost. With volumes (like we use for SQLite), data persists on your computer.
+**A:** Without volumes, data is lost. With volumes (like we use for MySQL), data persists in the database container.
 
 ### Q: Can containers talk to each other?
 **A:** Yes! When containers are in the same Docker network, they can communicate using service names.

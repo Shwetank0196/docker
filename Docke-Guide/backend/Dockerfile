@@ -1,8 +1,8 @@
-# Use official Node.js 18 LTS (Long Term Support) image with Alpine Linux
+# Use official Node.js 18 LTS (Long Term Support) image
 # Alpine is a lightweight Linux distribution, making the image smaller
 FROM node:18
 
-# Install build dependencies needed for native modules (like sqlite3)
+# Install build dependencies needed for native modules (like mysql2)
 # python3, make, and g++ are required for node-gyp to compile native addons
 RUN apt-get update && apt-get install -y python3 make g++
 
@@ -22,10 +22,6 @@ RUN npm install
 # Copy the rest of the application code
 # This is done after npm install so code changes don't invalidate the npm install cache
 COPY . .
-
-# Create the data directory for SQLite database
-# This ensures the directory exists even if not in the source code
-RUN mkdir -p /app/data
 
 # Expose port 3000
 # This documents which port the application uses

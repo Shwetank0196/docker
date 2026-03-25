@@ -506,7 +506,7 @@ RUN npm install
 # Now copy the rest of the application code
 COPY . .
 
-# Create data directory for SQLite database
+# Create data directory (legacy - no longer needed with MySQL container)
 RUN mkdir -p /app/data
 
 # Document that this app uses port 3000

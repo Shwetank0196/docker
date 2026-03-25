@@ -1,39 +1,41 @@
 const express = require('express');
 const router = express.Router();
-const { db } = require('../database');
+const { promisePool } = require('../database');
 
 // GET all students
-router.get('/', (req, res) => {
+router.get('/', async (req, res) => {
   const sql = 'SELECT * FROM students ORDER BY created_at DESC';
 
-  db.all(sql, [], (err, rows) => {
-    if (err) {
-      console.error('Error fetching students:', err.message);
-      return res.status(500).json({ error: 'Failed to fetch students' });
-    }
+  try {
+    const [rows] = await promisePool.execute(sql);
     res.json({ students: rows, count: rows.length });
-  });
+  } catch (err) {
+    console.error('Error fetching students:', err.message);
+    res.status(500).json({ error: 'Failed to fetch students' });
+  }
 });
 
 // GET single student by ID
-router.get('/:id', (req, res) => {
+router.get('/:id', async (req, res) => {
   const { id } = req.params;
   const sql = 'SELECT * FROM students WHERE id = ?';
 
-  db.get(sql, [id], (err, row) => {
-    if (err) {
-      console.error('Error fetching student:', err.message);
-      return res.status(500).json({ error: 'Failed to fetch student' });
-    }
-    if (!row) {
+  try {
+    const [rows] = await promisePool.execute(sql, [id]);
+
+    if (rows.length === 0) {
       return res.status(404).json({ error: 'Student not found' });
     }
-    res.json(row);
-  });
+
+    res.json(rows[0]);
+  } catch (err) {
+    console.error('Error fetching student:', err.message);
+    res.status(500).json({ error: 'Failed to fetch student' });
+  }
 });
 
 // POST create new student
-router.post('/', (req, res) => {
+router.post('/', async (req, res) => {
   const { name, age, father_name, aadhaar_number, class: studentClass } = req.body;
 
   // Validation
@@ -63,27 +65,34 @@ router.post('/', (req, res) => {
     VALUES (?, ?, ?, ?, ?)
   `;
 
-  db.run(sql, [name, age, father_name, aadhaar_number, studentClass], function(err) {
-    if (err) {
-      if (err.message.includes('UNIQUE constraint failed')) {
-        return res.status(409).json({
-          error: 'Student with this Aadhaar number already exists'
-        });
-      }
-      console.error('Error creating student:', err.message);
-      return res.status(500).json({ error: 'Failed to create student' });
-    }
+  try {
+    const [result] = await promisePool.execute(sql, [name, age, father_name, aadhaar_number, studentClass]);
 
     res.status(201).json({
       message: 'Student created successfully',
-      id: this.lastID,
-      student: { id: this.lastID, name, age, father_name, aadhaar_number, class: studentClass }
+      id: result.insertId,
+      student: {
+        id: result.insertId,
+        name,
+        age,
+        father_name,
+        aadhaar_number,
+        class: studentClass
+      }
     });
-  });
+  } catch (err) {
+    if (err.code === 'ER_DUP_ENTRY') {
+      return res.status(409).json({
+        error: 'Student with this Aadhaar number already exists'
+      });
+    }
+    console.error('Error creating student:', err.message);
+    res.status(500).json({ error: 'Failed to create student' });
+  }
 });
 
 // PUT update student
-router.put('/:id', (req, res) => {
+router.put('/:id', async (req, res) => {
   const { id } = req.params;
   const { name, age, father_name, aadhaar_number, class: studentClass } = req.body;
 
@@ -115,40 +124,37 @@ router.put('/:id', (req, res) => {
     WHERE id = ?
   `;
 
-  db.run(sql, [name, age, father_name, aadhaar_number, studentClass, id], function(err) {
-    if (err) {
-      if (err.message.includes('UNIQUE constraint failed')) {
-        return res.status(409).json({
-          error: 'Another student with this Aadhaar number already exists'
-        });
-      }
-      console.error('Error updating student:', err.message);
-      return res.status(500).json({ error: 'Failed to update student' });
-    }
+  try {
+    const [result] = await promisePool.execute(sql, [name, age, father_name, aadhaar_number, studentClass, id]);
 
-    if (this.changes === 0) {
+    if (result.affectedRows === 0) {
       return res.status(404).json({ error: 'Student not found' });
     }
 
     res.json({
       message: 'Student updated successfully',
-      student: { id, name, age, father_name, aadhaar_number, class: studentClass }
+      student: { id: parseInt(id), name, age, father_name, aadhaar_number, class: studentClass }
     });
-  });
+  } catch (err) {
+    if (err.code === 'ER_DUP_ENTRY') {
+      return res.status(409).json({
+        error: 'Another student with this Aadhaar number already exists'
+      });
+    }
+    console.error('Error updating student:', err.message);
+    res.status(500).json({ error: 'Failed to update student' });
+  }
 });
 
 // DELETE student
-router.delete('/:id', (req, res) => {
+router.delete('/:id', async (req, res) => {
   const { id } = req.params;
   const sql = 'DELETE FROM students WHERE id = ?';
 
-  db.run(sql, [id], function(err) {
-    if (err) {
-      console.error('Error deleting student:', err.message);
-      return res.status(500).json({ error: 'Failed to delete student' });
-    }
+  try {
+    const [result] = await promisePool.execute(sql, [id]);
 
-    if (this.changes === 0) {
+    if (result.affectedRows === 0) {
       return res.status(404).json({ error: 'Student not found' });
     }
 
@@ -156,7 +162,10 @@ router.delete('/:id', (req, res) => {
       message: 'Student deleted successfully',
       id: parseInt(id)
     });
-  });
+  } catch (err) {
+    console.error('Error deleting student:', err.message);
+    res.status(500).json({ error: 'Failed to delete student' });
+  }
 });
 
 module.exports = router;

@@ -117,24 +117,29 @@ services:
 
 ## Our Project's Volume Usage
 
-**We use a bind mount for SQLite database:**
+**We use named volumes for MySQL database:**
 
 ```yaml
 services:
-  backend:
+  mysql-db:
     volumes:
-      - ./backend/data:/app/data
+      - mysql-data:/var/lib/mysql
+
+volumes:
+  mysql-data:
+    driver: local
 ```
 
 **What this does:**
-- Left side (`./backend/data`): Folder on your computer
-- Right side (`/app/data`): Folder inside container
-- SQLite database file is stored in `./backend/data/students.db`
+- `mysql-data`: Named volume managed by Docker
+- `/var/lib/mysql`: MySQL's data directory inside container
+- Database data is stored persistently in Docker-managed volume
 
-**Why use bind mount here?**
-- Easy to backup (just copy the folder)
-- Can explore database with SQLite tools
-- Good for development and learning
+**Why use named volume here?**
+- Better performance than bind mounts
+- Docker manages backup and migration
+- More secure (no direct file system access)
+- Production-ready approach
 
 ---
 
@@ -326,14 +331,14 @@ docker-compose down -v
 
 ## Data Persistence in Our Project
 
-**SQLite database persists between restarts:**
+**MySQL database persists between restarts:**
 
 ```bash
 # 1. Start application
 docker-compose up -d
 
 # 2. Add some students via the web interface
-# Data is saved to ./backend/data/students.db
+# Data is saved to MySQL database in named volume
 
 # 3. Stop all containers
 docker-compose down
@@ -344,7 +349,7 @@ docker-compose up -d
 # 5. Students are still there! ✅
 ```
 
-**Why?** The volume mounts `./backend/data` to `/app/data` in the container. SQLite writes to this folder, which is actually on your computer.
+**Why?** The named volume `mysql-data` persists MySQL data between container restarts. Docker manages this volume independently of container lifecycle.
 
 ---
 
@@ -581,10 +586,9 @@ volumes:
 
 **.gitignore:**
 ```
-# Data files
+# Data files (legacy - now using MySQL volumes)
 data/
 *.db
-*.sqlite
 
 # Logs
 logs/
