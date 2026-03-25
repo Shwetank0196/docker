@@ -1,4 +1,7 @@
-# Docker Basics
+# On your server
+cd ~
+git clone <repository-url>
+cd docker/Docke-Guide# Docker Basics
 
 Welcome to the Docker basics guide! This document explains core Docker concepts in simple, beginner-friendly terms.
 

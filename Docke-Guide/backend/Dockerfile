@@ -2,6 +2,10 @@
 # Alpine is a lightweight Linux distribution, making the image smaller
 FROM node:18-alpine
 
+# Install build dependencies needed for native modules (like sqlite3)
+# python3, make, and g++ are required for node-gyp to compile native addons
+RUN apk add --no-cache python3 make g++
+
 # Set the working directory inside the container
 # All subsequent commands will run from this directory
 WORKDIR /app
