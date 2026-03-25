@@ -1,0 +1,100 @@
+# Docker Compose version
+# Version 3.8 is widely compatible and includes all features we need
+version: '3.8'
+
+# Define all services (containers) for our application
+services:
+
+  # Backend API Service
+  backend:
+    # Build from Dockerfile in ./backend directory
+    build: ./backend
+
+    # Custom container name (easier to identify and manage)
+    container_name: student-api
+
+    # Port mapping: host:container
+    # Access backend at http://localhost:3000
+    ports:
+      - "3000:3000"
+
+    # Volume mapping for data persistence
+    # SQLite database file persists even after container restarts
+    # Format: host_path:container_path
+    volumes:
+      - ./backend/data:/app/data
+
+    # Environment variables passed to the container
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+
+    # Restart policy: always restart unless manually stopped
+    restart: unless-stopped
+
+    # Connect to custom network
+    networks:
+      - student-network
+
+  # Frontend Service
+  frontend:
+    # Build from Dockerfile in ./frontend directory
+    build: ./frontend
+
+    # Custom container name
+    container_name: student-frontend
+
+    # Port mapping: host:container
+    # Access frontend directly at http://localhost:8080 (for testing)
+    # Normally accessed through Nginx at http://localhost
+    ports:
+      - "8080:80"
+
+    # Wait for backend to start before starting frontend
+    # Note: This only waits for container start, not for app readiness
+    depends_on:
+      - backend
+
+    # Restart policy
+    restart: unless-stopped
+
+    # Connect to custom network
+    networks:
+      - student-network
+
+  # Nginx Reverse Proxy Service
+  nginx:
+    # Build from Dockerfile in ./nginx directory
+    build: ./nginx
+
+    # Custom container name
+    container_name: student-nginx
+
+    # Port mapping: host:container
+    # Main entry point: http://localhost
+    ports:
+      - "80:80"
+
+    # Wait for backend and frontend to start
+    depends_on:
+      - backend
+      - frontend
+
+    # Restart policy
+    restart: unless-stopped
+
+    # Connect to custom network
+    networks:
+      - student-network
+
+# Define custom networks
+# Containers in the same network can communicate using service names
+networks:
+  student-network:
+    # Bridge network driver (default for single host)
+    driver: bridge
+
+# Define named volumes (optional, for future use)
+# Currently using bind mounts, but named volumes are better for production
+volumes:
+  backend-data:
