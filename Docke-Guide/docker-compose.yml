@@ -45,10 +45,10 @@ services:
     container_name: student-frontend
 
     # Port mapping: host:container
-    # Access frontend directly at http://localhost:8080 (for testing)
-    # Normally accessed through Nginx at http://localhost
+    # Access frontend directly at http://localhost:8082 (avoiding Jenkins port conflicts)
+    # Normally accessed through Nginx at http://localhost:8081
     ports:
-      - "8080:80"
+      - "8082:80"
 
     # Wait for backend to start before starting frontend
     # Note: This only waits for container start, not for app readiness
@@ -71,9 +71,9 @@ services:
     container_name: student-nginx
 
     # Port mapping: host:container
-    # Main entry point: http://localhost
+    # Main entry point: http://localhost:8081 (avoiding Jenkins port conflicts)
     ports:
-      - "80:80"
+      - "8081:80"
 
     # Wait for backend and frontend to start
     depends_on:
