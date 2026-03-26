@@ -380,6 +380,16 @@ CMD ["nginx", "-g", "daemon off;"]
 
 ### Building an Image
 
+Create a folder and two files:
+```bash
+mkdir my-docker-app
+cd my-docker-app
+```
+
+my-docker-app/
+├── Dockerfile
+└── index.html
+
 Create a simple `index.html` file first:
 
 **index.html:**
@@ -396,20 +406,48 @@ Create a simple `index.html` file first:
 </html>
 ```
 
-**Build command:**
+**Dockerfile:**
+```dockerfile
+FROM nginx:latest
+
+COPY index.html /usr/share/nginx/html/index.html
+
+EXPOSE 80
+
+CMD ["nginx", "-g", "daemon off;"]
+```
+
+#### ** Build the Image**
+
 ```bash
 docker build -t my-nginx-app .
 ```
 
-**Explanation:**
-- `build` creates an image from Dockerfile
-- `-t my-nginx-app` gives your image a name (tag)
-- `.` means look for Dockerfile in current directory
+**What this does:**
+- `-t my-nginx-app` = Name your new image "my-nginx-app"
+- `.` = Use Dockerfile in current directory
+- Creates an image containing nginx + your HTML file
+
+**Important:** Don't forget the dot (`.`) at the end!
+
+**Verify it worked:**
+```bash
+docker images
+```
+You should see `my-nginx-app` in the list.
 
 **Run your custom image:**
 ```bash
-docker run -d -p 8080:80 my-nginx-app
+docker run -d -p 8080:80 --name my-web-app my-nginx-app
 ```
+
+**What this does:**
+- `-d` = Run in background
+- `-p 8080:80` = Map port 8080 (your computer) to port 80 (container)
+- `--name my-web-app` = Name the container
+- `my-nginx-app` = Use YOUR image (not the base nginx image)
+
+---
 
 Now visit `http://localhost:8080` to see your custom page!
 
