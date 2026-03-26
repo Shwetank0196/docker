@@ -459,32 +459,248 @@ Now visit `http://localhost:8080` to see your custom page!
 
 ## 4. Intermediate Concepts
 
-### 4.1 Docker Networking (Basic)
-
 #### What is Docker Networking?
 
-Networking allows containers to talk to each other and to the outside world.
+Docker networking allows containers to communicate with each other by name, just like computers on a network.
 
-**Simple explanation:** Just like computers on a network can communicate, Docker containers can too.
+**Real-world example:**
+- Your **backend app** (Node.js/Python) needs to connect to a **database** (MySQL/Postgres)
+- Your **frontend** needs to call your **backend API**
+- Without networking, containers are isolated and can't find each other
 
-#### Basic Example
+**Think of it like:** Houses on a street. Without addresses, you can't visit your neighbor. Docker networks give containers "addresses" so they can talk to each other.
 
-By default, containers can communicate with each other if they're on the same network.
+---
 
-**Create a network:**
+#### BEFORE: The Problem (Without Custom Network)
+
+Let's see what happens when we DON'T use a custom network.
+
+**Step 1: Run two containers without a custom network**
+
+```bash
+# Start first container
+docker run -dit --name container1 busybox sh
+
+# Start second container
+docker run -dit --name container2 busybox sh
+```
+
+**What we did:**
+- Created 2 simple containers using `busybox` (a minimal Linux image)
+- `-dit` = detached + interactive + terminal (runs in background but keeps shell open)
+
+**Step 2: Try to ping container2 from container1 by name**
+
+```bash
+docker exec -it container1 ping container2
+```
+
+**Result: ❌ FAILS**
+```
+ping: bad address 'container2'
+```
+
+**Why it fails:**
+- By default, containers are on Docker's default bridge network
+- The default bridge network **does NOT support DNS resolution by container name**
+- Containers can only communicate using IP addresses on the default network
+
+**Step 3: Try with IP address (it works, but not practical)**
+
+First, find container2's IP:
+```bash
+docker inspect container2 | grep IPAddress
+```
+
+Output:
+```
+"IPAddress": "172.17.0.3"
+```
+
+Now ping by IP:
+```bash
+docker exec -it container1 ping 172.17.0.3
+```
+
+**Result: ✅ This works, but...**
+- IPs change every time you restart containers
+- Hard to remember and manage
+- Not practical for real applications
+
+**The Problem:** Default bridge is not suitable for production apps!
+
+**Clean up:**
+```bash
+docker rm -f container1 container2
+```
+
+---
+
+#### SOLUTION: Custom Network (The Right Way)
+
+Custom networks enable **automatic DNS resolution** by container name.
+
+**Step 1: Create a custom network**
+
 ```bash
 docker network create my-network
 ```
 
-**Run containers on the same network:**
+**What this does:**
+- Creates a bridge network named `my-network`
+- Enables DNS resolution (containers can find each other by name)
+- Isolates your containers from others
+
+**Verify it was created:**
 ```bash
-docker run -d --name database --network my-network postgres
-docker run -d --name webapp --network my-network nginx
+docker network ls
 ```
 
-Now the `webapp` container can connect to the `database` container using the name `database` as the hostname.
+Output:
+```
+NETWORK ID     NAME         DRIVER    SCOPE
+abc123def456   bridge       bridge    local
+xyz789abc123   my-network   bridge    local
+```
 
-**That's it!** For beginners, just know that Docker networks help containers communicate.
+---
+
+**Step 2: Run containers on the custom network**
+
+```bash
+# Start container1 on my-network
+docker run -dit --name c1 --network my-network busybox sh
+
+# Start container2 on my-network
+docker run -dit --name c2 --network my-network busybox sh
+```
+
+**What changed:**
+- Added `--network my-network` flag
+- Both containers are now on the same custom network
+
+---
+
+**Step 3: Test communication by container name**
+
+```bash
+# From c1, ping c2 by name
+docker exec -it c1 ping c2
+```
+
+**Result: ✅ SUCCESS!**
+```
+PING c2 (172.18.0.3): 56 data bytes
+64 bytes from 172.18.0.3: seq=0 ttl=64 time=0.123 ms
+64 bytes from 172.18.0.3: seq=1 ttl=64 time=0.098 ms
+```
+
+**It works!** Container `c1` can reach `c2` by name.
+
+**Test the other direction:**
+```bash
+docker exec -it c2 ping c1
+```
+
+Also works! ✅
+
+**Press Ctrl+C to stop the ping.**
+
+---
+
+#### What Happens Internally?
+
+**1. Docker DNS**
+- Docker runs an internal DNS server for custom networks
+- When `c1` pings `c2`, Docker DNS resolves `c2` to its IP address
+- Each container name becomes a hostname automatically
+
+**2. Bridge Network**
+- Custom networks use the `bridge` driver by default
+- Creates a virtual network inside your computer
+- All containers on the same bridge can communicate
+
+**3. Internal IPs**
+- Each container gets an internal IP (e.g., 172.18.0.x)
+- These IPs are private and only visible inside Docker
+- Format: `172.x.x.x` (Docker's internal range)
+
+**Visual:**
+```
+Your Computer
+  └── my-network (bridge)
+        ├── c1 (172.18.0.2)  ← Can ping c2 by name
+        └── c2 (172.18.0.3)  ← Can ping c1 by name
+```
+
+---
+
+#### Verification Commands
+
+**1. List all networks**
+
+```bash
+docker network ls
+```
+
+Shows all networks on your system.
+
+---
+
+**2. Inspect a network**
+
+```bash
+docker network inspect my-network
+```
+
+**Output (important fields):**
+```json
+[
+    {
+        "Name": "my-network",
+        "Driver": "bridge",
+        "Scope": "local",
+        "IPAM": {
+            "Config": [
+                {
+                    "Subnet": "172.18.0.0/16",
+                    "Gateway": "172.18.0.1"
+                }
+            ]
+        },
+        "Containers": {
+            "abc123...": {
+                "Name": "c1",
+                "IPv4Address": "172.18.0.2/16"
+            },
+            "def456...": {
+                "Name": "c2",
+                "IPv4Address": "172.18.0.3/16"
+            }
+        }
+    }
+]
+```
+
+**What to look for:**
+- **Subnet**: The IP range for this network (172.18.0.0/16)
+- **Gateway**: The network gateway (172.18.0.1)
+- **Containers**: List of all containers on this network with their IPs
+
+---
+
+**3. Check which containers are on a network**
+
+```bash
+docker network inspect my-network -f '{{range .Containers}}{{.Name}} {{.IPv4Address}}{{println}}{{end}}'
+```
+
+Output:
+```
+c1 172.18.0.2/16
+c2 172.18.0.3/16
+```
 
 ---
 
