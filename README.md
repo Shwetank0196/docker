@@ -710,81 +710,322 @@ c2 172.18.0.3/16
 
 When a container stops, all data inside it is **lost**. Volumes let you save data permanently.
 
-**Real-world problem:** You run a database container, add data, then stop it. When you start again, all data is gone!
+**The Problem:**
+- You run a MySQL database container
+- Add some data (users, posts, etc.)
+- Stop the container
+- Start it again → **All data is gone!** 😱
 
-**Solution:** Use volumes to save data outside the container.
+**The Solution:**
+- Use **volumes** to save data outside the container
+- Data persists even when container is removed
+- Essential for databases, file uploads, logs, etc.
 
-#### Types of Volumes
+---
 
-**1. Named Volumes (Recommended)**
+#### Two Types of Volumes
 
-Docker manages the storage for you.
+**1. Named Volumes** (For databases)
+- Docker manages where data is stored
+- Best for persistent data (databases, important files)
+- Data survives container deletion
+
+**2. Bind Mounts** (For development)
+- Links a folder on your computer to a folder in the container
+- Best for code/files you want to edit live
+- Changes appear instantly in the container
+
+---
+
+#### Complete Practical Example
+
+Let's build a simple project with:
+- **nginx** serving a website (using bind mount)
+- **MySQL** database (using named volume)
+- Both containers working together
+
+---
+
+#### Step 1: Create Project Folder
 
 ```bash
-# Create and use a volume
-docker run -d --name my-database -v my-data:/var/lib/postgresql/data postgres
+mkdir docker-volume-demo
+cd docker-volume-demo
 ```
 
-**Explanation:**
-- `-v my-data:/var/lib/postgresql/data`
-- `my-data` = volume name (Docker manages where it's stored)
-- `/var/lib/postgresql/data` = path inside container where data is saved
+---
 
-**List volumes:**
+#### Step 2: Create a Simple Website
+
+Create `index.html`:
+
+```html
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Docker Volume Demo</title>
+    <style>
+        body { font-family: Arial; text-align: center; padding: 50px; }
+        h1 { color: #0066cc; }
+    </style>
+</head>
+<body>
+    <h1>Welcome to Docker Volume Demo!</h1>
+    <p>This page is served by nginx using a bind mount.</p>
+    <p>MySQL database is running with persistent volume storage.</p>
+</body>
+</html>
+```
+
+**Folder structure:**
+```
+docker-volume-demo/
+└── index.html
+```
+
+---
+
+#### Step 3: Run MySQL with Named Volume
+
+```bash
+docker run -d \
+  --name mysql-db \
+  -e MYSQL_ROOT_PASSWORD=mypassword \
+  -e MYSQL_DATABASE=testdb \
+  -v mysql-data:/var/lib/mysql \
+  -p 3306:3306 \
+  mysql:8.0
+```
+
+**Breaking down the command:**
+- `-d` = Run in background
+- `--name mysql-db` = Container name
+- `-e MYSQL_ROOT_PASSWORD=mypassword` = Set root password
+- `-e MYSQL_DATABASE=testdb` = Create a database called "testdb"
+- `-v mysql-data:/var/lib/mysql` = Mount named volume
+  - `mysql-data` = Volume name (Docker manages storage location)
+  - `/var/lib/mysql` = **MySQL's default data folder** (where it stores databases)
+- `-p 3306:3306` = Expose MySQL port
+- `mysql:8.0` = Use MySQL version 8.0
+
+**Why `/var/lib/mysql`?**
+- This is where MySQL stores all its data (databases, tables, users)
+- By mounting a volume here, all data is saved outside the container
+- Like saving your documents folder to a USB drive
+
+---
+
+#### Step 4: Run nginx with Bind Mount
+
+```bash
+docker run -d \
+  --name web-server \
+  -p 8080:80 \
+  -v ./:/usr/share/nginx/html \
+  nginx
+```
+
+**Breaking down the command:**
+- `-d` = Run in background
+- `--name web-server` = Container name
+- `-p 8080:80` = Map port 8080 (your computer) to 80 (container)
+- `-v ./:/usr/share/nginx/html` = Mount current folder
+  - `./` = Current folder (docker-volume-demo)
+  - `/usr/share/nginx/html` = **nginx's default web folder** (where it serves files from)
+- `nginx` = Use nginx image
+
+**Why `/usr/share/nginx/html`?**
+- This is nginx's default folder for serving web pages
+- Any file you put in this folder is served as a web page
+- By mounting your local folder here, nginx serves YOUR files
+
+---
+
+#### Step 5: Verify Containers are Running
+
+```bash
+docker ps
+```
+
+**Expected output:**
+```
+CONTAINER ID   IMAGE       COMMAND                  PORTS                    NAMES
+abc123def456   nginx       "nginx -g 'daemon of…"   0.0.0.0:8080->80/tcp     web-server
+xyz789abc123   mysql:8.0   "docker-entrypoint.s…"   0.0.0.0:3306->3306/tcp   mysql-db
+```
+
+You should see both containers running! ✅
+
+---
+
+#### Step 6: Test the Website
+
+Open your browser:
+```
+http://localhost:8080
+```
+
+You should see your website! 🎉
+
+**Live editing test:**
+1. Edit `index.html` on your computer (change the text)
+2. Save the file
+3. Refresh your browser → Changes appear instantly!
+
+**This works because of the bind mount** - your local folder is directly linked to nginx.
+
+---
+
+#### Step 7: List Volumes
+
 ```bash
 docker volume ls
 ```
 
-**2. Bind Mounts (Simple File Sharing)**
-
-Share a folder from your computer with the container.
-
-```bash
-# Share your local folder with container
-docker run -d -p 8080:80 -v ./my-website:/usr/share/nginx/html nginx
+**Output:**
+```
+DRIVER    VOLUME NAME
+local     mysql-data
 ```
 
-**Explanation:**
-- `./my-website` = folder on your computer
-- `:/usr/share/nginx/html` = folder inside container
-- Any changes you make to files are instantly visible!
-
-#### Practical Example: Database with Persistent Data
-
-```bash
-# Run MySQL with data saved in volume
-docker run -d \
-  --name my-mysql \
-  -e MYSQL_ROOT_PASSWORD=secret123 \
-  -v mysql-data:/var/lib/mysql \
-  -p 3306:3306 \
-  mysql
-
-# Your data is safe even after stopping container
-docker stop my-mysql
-docker start my-mysql  # Data is still there!
-```
-
-#### Example: Edit Files Without Rebuilding
-
-```bash
-# Create a project folder
-mkdir my-website
-echo "<h1>Hello World</h1>" > my-website/index.html
-
-# Run nginx with your folder
-docker run -d -p 8080:80 -v ./my-website:/usr/share/nginx/html nginx
-
-# Edit my-website/index.html on your computer
-# Refresh browser - changes appear instantly!
-```
-
-**Key Points:**
-- Use **named volumes** for databases and important data
-- Use **bind mounts** for development (edit files easily)
-- Data in volumes survives container removal
+You can see the `mysql-data` volume we created! ✅
 
 ---
+
+#### Step 8: Inspect the Volume
+
+```bash
+docker volume inspect mysql-data
+```
+
+**Output:**
+```json
+[
+    {
+        "CreatedAt": "2026-03-26T10:30:00Z",
+        "Driver": "local",
+        "Labels": null,
+        "Mountpoint": "/var/lib/docker/volumes/mysql-data/_data",
+        "Name": "mysql-data",
+        "Options": null,
+        "Scope": "local"
+    }
+]
+```
+
+**Important fields:**
+- **Name**: `mysql-data` - Your volume name
+- **Mountpoint**: Where Docker stores the data on your computer
+- **Driver**: `local` - Stored on local disk
+
+---
+
+#### Step 9: Test Data Persistence
+
+Let's prove that MySQL data persists even after stopping the container!
+
+**Step 9.1: Connect to MySQL and create data**
+
+```bash
+docker exec -it mysql-db mysql -u root -pmypassword
+```
+
+**Inside MySQL, run:**
+```sql
+USE testdb;
+CREATE TABLE users (id INT, name VARCHAR(50));
+INSERT INTO users VALUES (1, 'John Doe');
+INSERT INTO users VALUES (2, 'Jane Smith');
+SELECT * FROM users;
+```
+
+**Output:**
+```
++------+------------+
+| id   | name       |
++------+------------+
+|    1 | John Doe   |
+|    2 | Jane Smith |
++------+------------+
+```
+
+**Exit MySQL:**
+```sql
+exit
+```
+
+---
+
+**Step 9.2: Stop and remove the MySQL container**
+
+```bash
+docker stop mysql-db
+docker rm mysql-db
+```
+
+**The container is gone!** But the volume remains:
+```bash
+docker volume ls
+```
+
+You still see `mysql-data` ✅
+
+---
+
+**Step 9.3: Start a NEW MySQL container with the same volume**
+
+```bash
+docker run -d \
+  --name mysql-db-new \
+  -e MYSQL_ROOT_PASSWORD=mypassword \
+  -v mysql-data:/var/lib/mysql \
+  -p 3306:3306 \
+  mysql:8.0
+```
+
+**Note:** Different container name (`mysql-db-new`), but same volume (`mysql-data`)!
+
+---
+
+**Step 9.4: Check if data still exists**
+
+```bash
+docker exec -it mysql-db-new mysql -u root -pmypassword -e "SELECT * FROM testdb.users;"
+```
+
+**Output:**
+```
++------+------------+
+| id   | name       |
++------+------------+
+|    1 | John Doe   |
+|    2 | Jane Smith |
++------+------------+
+```
+
+**🎉 The data is still there!** Even though we deleted the original container!
+
+**This proves volumes persist data independently of containers.**
+
+---
+
+#### Understanding Bind Mount vs Named Volume
+
+| Feature | Bind Mount | Named Volume |
+|---------|-----------|--------------|
+| **Location** | Your folder (./my-folder) | Docker-managed location |
+| **Use case** | Development, live editing | Databases, important data |
+| **Example** | `-v ./my-website:/usr/share/nginx/html` | `-v mysql-data:/var/lib/mysql` |
+| **Visibility** | Files visible on your computer | Hidden in Docker storage |
+| **Best for** | Code, HTML, CSS you want to edit | Database data, uploads, logs |
+| **Edit files** | ✅ Yes, directly on your computer | ❌ Not recommended |
+
+**Simple rule:**
+- **Want to edit files?** → Use bind mount (`-v ./folder:/container/path`)
+- **Want to save data?** → Use named volume (`-v volume-name:/container/path`)
+
+---
+
 
 ### 4.3 Environment Variables
 
