@@ -386,9 +386,13 @@ mkdir my-docker-app
 cd my-docker-app
 ```
 
+```
 my-docker-app/
 ├── Dockerfile
 └── index.html
+```
+
+---
 
 Create a simple `index.html` file first:
 
