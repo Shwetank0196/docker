@@ -1220,88 +1220,417 @@ Docker Compose is a tool for running **multiple containers** together. Instead o
 - One command to start everything
 - Easy to share your full application setup
 
-#### Simple docker-compose.yml Example
+#### Complete Real-World Example: Node.js + MySQL
 
-Let's create a web app with nginx and a database:
+Now let's build something real! A Node.js app that connects to a MySQL database. This is exactly what you'll do in real projects.
 
-**docker-compose.yml:**
-```yaml
-version: '3.8'
+**What we'll build:**
+- MySQL database with persistence (volume)
+- Node.js app that connects to MySQL
+- Both containers talking on a custom network
+- A test script that proves it works
 
-services:
-  # Web server
-  web:
-    image: nginx:1.25.3
-    container_name: my-nginx
-    ports:
-      - "8080:80"
-    volumes:
-      - ./index.html:/usr/share/nginx/html/index.html
-    networks:
-      - app-network
-
-  # Database
-  database:
-    image: mysql:8.0
-    container_name: my-mysql
-    environment:
-      MYSQL_ROOT_PASSWORD: rootpass123
-      MYSQL_DATABASE: myapp_db
-      MYSQL_USER: appuser
-      MYSQL_PASSWORD: apppass123
-    volumes:
-      - mysql-data:/var/lib/mysql
-    networks:
-      - app-network
-
-# Define volumes
-volumes:
-  mysql-data:
-
-# Define networks
-networks:
-  app-network:
-```
-
-#### What Each Part Does:
-
-- **version: '3.8'** - Docker Compose file format version
-- **services:** - List of containers to run
-- **web:** - Name of our service
-- **image: nginx:1.25.3** - Use specific nginx version
-- **container_name:** - Custom name for the container
-- **ports:** - Map port 8080 on your computer to port 80 in container
-- **volumes:** - Share files between your computer and container
-- **environment:** - Set environment variables for the database
-- **networks:** - Connect services to the same network (so web can talk to database)
-- **volumes: mysql-data:** - Define named volume for database persistence
+**Why this matters:**
+- This is how Docker Compose works behind the scenes
+- Same pattern for any multi-container app (web app + database, API + cache, etc.)
+- Understanding this makes Docker Compose easy
 
 ---
 
-#### Docker Compose Commands
+#### Step 1: Create Project Folder
 
-**Start all services:**
 ```bash
-docker-compose up
-```
-
-**Start in background:**
-```bash
-docker-compose up -d
-```
-
-**Stop and remove all services:**
-```bash
-docker-compose down
-```
-
-**View running services:**
-```bash
-docker-compose ps
+mkdir node-mysql-demo
+cd node-mysql-demo
 ```
 
 ---
 
+#### Step 2: Create Node.js Test Script
+
+Create a file named `test-connection.js`:
+
+```javascript
+// Simple Node.js script to test MySQL connection
+const mysql = require('mysql2');
+
+// Database configuration
+const dbConfig = {
+  host: 'mysql-db',        // Container name becomes hostname!
+  port: 3306,
+  user: 'appuser',
+  password: 'apppass123',
+  database: 'myapp_db'
+};
+
+console.log('Attempting to connect to MySQL...');
+console.log(`Host: ${dbConfig.host}`);
+console.log(`Database: ${dbConfig.database}`);
+console.log(`User: ${dbConfig.user}`);
+console.log('---');
+
+// Create connection
+const connection = mysql.createConnection(dbConfig);
+
+// Try to connect
+connection.connect((err) => {
+  if (err) {
+    console.error('❌ Connection failed!');
+    console.error('Error:', err.message);
+    process.exit(1);
+  }
+
+  console.log('✅ Connected to MySQL successfully!');
+  console.log(`Connection ID: ${connection.threadId}`);
+
+  // Test query: Show current database
+  connection.query('SELECT DATABASE() as db', (err, results) => {
+    if (err) {
+      console.error('Query failed:', err.message);
+      connection.end();
+      process.exit(1);
+    }
+
+    console.log(`Current database: ${results[0].db}`);
+
+    // Create a test table and insert data
+    const createTable = `
+      CREATE TABLE IF NOT EXISTS users (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(100),
+        email VARCHAR(100),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `;
+
+    connection.query(createTable, (err) => {
+      if (err) {
+        console.error('Create table failed:', err.message);
+        connection.end();
+        process.exit(1);
+      }
+
+      console.log('✅ Table "users" created or already exists');
+
+      // Insert test data
+      const insertUser = 'INSERT INTO users (name, email) VALUES (?, ?)';
+      connection.query(insertUser, ['John Doe', 'john@example.com'], (err, result) => {
+        if (err) {
+          console.error('Insert failed:', err.message);
+          connection.end();
+          process.exit(1);
+        }
+
+        console.log(`✅ Inserted user with ID: ${result.insertId}`);
+
+        // Query all users
+        connection.query('SELECT * FROM users', (err, results) => {
+          if (err) {
+            console.error('Select failed:', err.message);
+            connection.end();
+            process.exit(1);
+          }
+
+          console.log('✅ Users in database:');
+          console.table(results);
+
+          console.log('---');
+          console.log('🎉 All tests passed! MySQL is working perfectly.');
+
+          // Close connection
+          connection.end();
+          process.exit(0);
+        });
+      });
+    });
+  });
+});
+```
+
+**What this script does:**
+1. Connects to MySQL using container name `mysql-db` as hostname
+2. Creates a `users` table
+3. Inserts test data
+4. Queries the data back
+5. Shows success messages
+
+---
+
+#### Step 3: Create package.json
+
+Create `package.json`:
+
+```json
+{
+  "name": "node-mysql-demo",
+  "version": "1.0.0",
+  "description": "Node.js app connecting to MySQL in Docker",
+  "main": "test-connection.js",
+  "scripts": {
+    "start": "node test-connection.js"
+  },
+  "dependencies": {
+    "mysql2": "^3.6.0"
+  }
+}
+```
+
+---
+
+#### Step 4: Create Dockerfile for Node.js App
+
+Create `Dockerfile`:
+
+```dockerfile
+# Use Node.js 18 as base image
+FROM node:18-alpine
+
+# Set working directory inside container
+WORKDIR /app
+
+# Copy package files first (for better caching)
+COPY package.json .
+
+# Install dependencies
+RUN npm install
+
+# Copy application code
+COPY test-connection.js .
+
+# Run the test script
+CMD ["npm", "start"]
+```
+
+**What each line does:**
+- `FROM node:18-alpine` - Start with Node.js (alpine = smaller image)
+- `WORKDIR /app` - Create and use /app folder inside container
+- `COPY package.json .` - Copy package.json into /app
+- `RUN npm install` - Install mysql2 library
+- `COPY test-connection.js .` - Copy our script
+- `CMD ["npm", "start"]` - Run the script when container starts
+
+**Folder structure now:**
+```
+node-mysql-demo/
+├── Dockerfile
+├── package.json
+└── test-connection.js
+```
+
+---
+
+#### Step 5: Build Node.js Docker Image
+
+```bash
+docker build -t node-mysql-app .
+```
+
+**Expected output:**
+```
+[+] Building 12.3s (10/10) FINISHED
+ => [1/5] FROM docker.io/library/node:18-alpine
+ => [2/5] WORKDIR /app
+ => [3/5] COPY package.json .
+ => [4/5] RUN npm install
+ => [5/5] COPY test-connection.js .
+ => exporting to image
+Successfully tagged node-mysql-app:latest
+```
+
+**Verify the image:**
+```bash
+docker images | grep node-mysql-app
+```
+
+You should see `node-mysql-app` listed! ✅
+
+---
+
+#### Step 6: Create Custom Network
+
+```bash
+docker network create app-network
+```
+
+**Why?** So our containers can find each other by name!
+
+**Verify:**
+```bash
+docker network ls | grep app-network
+```
+
+---
+
+#### Step 7: Run MySQL Container
+
+```bash
+docker run -d \
+  --name mysql-db \
+  --network app-network \
+  -e MYSQL_ROOT_PASSWORD=rootpass123 \
+  -e MYSQL_DATABASE=myapp_db \
+  -e MYSQL_USER=appuser \
+  -e MYSQL_PASSWORD=apppass123 \
+  -v mysql-data:/var/lib/mysql \
+  -p 3306:3306 \
+  mysql:8.0
+```
+
+**Breaking it down:**
+- `--name mysql-db` - Container name (used as hostname!)
+- `--network app-network` - Connect to our custom network
+- `-e MYSQL_ROOT_PASSWORD=rootpass123` - Root password
+- `-e MYSQL_DATABASE=myapp_db` - Create database
+- `-e MYSQL_USER=appuser` - Create user
+- `-e MYSQL_PASSWORD=apppass123` - User password
+- `-v mysql-data:/var/lib/mysql` - Persist data
+- `-p 3306:3306` - Expose MySQL port (optional, for external access)
+
+**Wait for MySQL to be ready:**
+```bash
+docker logs mysql-db
+```
+
+Look for: `ready for connections` ✅
+
+---
+
+#### Step 8: Run Node.js Container
+
+```bash
+docker run --rm \
+  --name node-app \
+  --network app-network \
+  node-mysql-app
+```
+
+**Breaking it down:**
+- `--rm` - Remove container after it finishes (one-time test)
+- `--name node-app` - Container name
+- `--network app-network` - **Same network as MySQL!**
+- `node-mysql-app` - Our image
+
+**Expected output:**
+
+```
+Attempting to connect to MySQL...
+Host: mysql-db
+Database: myapp_db
+User: appuser
+---
+✅ Connected to MySQL successfully!
+Connection ID: 8
+Current database: myapp_db
+✅ Table "users" created or already exists
+✅ Inserted user with ID: 1
+✅ Users in database:
+┌─────────┬────┬──────────┬──────────────────┬─────────────────────┐
+│ (index) │ id │   name   │      email       │     created_at      │
+├─────────┼────┼──────────┼──────────────────┼─────────────────────┤
+│    0    │ 1  │'John Doe'│'john@example.com'│2026-03-27 10:30:15  │
+└─────────┴────┴──────────┴──────────────────┴─────────────────────┘
+---
+🎉 All tests passed! MySQL is working perfectly.
+```
+
+**If you see this, it worked!** 🎉
+
+---
+
+#### Step 9: Inspect Network to Verify Connection
+
+Let's confirm both containers are on the same network:
+
+```bash
+docker network inspect app-network
+```
+
+**Look for the "Containers" section:**
+```json
+"Containers": {
+    "abc123...": {
+        "Name": "mysql-db",
+        "IPv4Address": "172.19.0.2/16"
+    },
+    "def456...": {
+        "Name": "node-app",
+        "IPv4Address": "172.19.0.3/16"
+    }
+}
+```
+
+Both containers are there! ✅
+
+**Shorter command to see just container names and IPs:**
+```bash
+docker network inspect app-network -f '{{range .Containers}}{{.Name}} - {{.IPv4Address}}{{println}}{{end}}'
+```
+
+**Output:**
+```
+mysql-db - 172.19.0.2/16
+node-app - 172.19.0.3/16
+```
+
+---
+
+#### Step 10: Verify Data Persists
+
+Let's prove the data is saved in the volume!
+
+**Stop and remove MySQL:**
+```bash
+docker stop mysql-db
+docker rm mysql-db
+```
+
+**Check volume still exists:**
+```bash
+docker volume ls | grep mysql-data
+```
+
+Still there! ✅
+
+**Start MySQL again with same volume:**
+```bash
+docker run -d \
+  --name mysql-db \
+  --network app-network \
+  -e MYSQL_ROOT_PASSWORD=rootpass123 \
+  -v mysql-data:/var/lib/mysql \
+  -p 3306:3306 \
+  mysql:8.0
+```
+
+**Wait a moment, then run Node.js app again:**
+```bash
+docker run --rm --name node-app --network app-network node-mysql-app
+```
+
+**Notice:** It inserts another user! The table and previous data still exist because of the volume. 🎉
+
+---
+
+#### How It All Works Together
+
+**Visual diagram:**
+
+```
+Your Computer
+│
+├── app-network (Docker network)
+│   │
+│   ├── mysql-db (172.19.0.2)
+│   │   ├── Hostname: "mysql-db"
+│   │   ├── Port: 3306
+│   │   └── Volume: mysql-data → /var/lib/mysql
+│   │
+│   └── node-app (172.19.0.3)
+│       ├── Connects to: "mysql-db:3306"
+│       └── DNS resolves "mysql-db" → 172.19.0.2
+│
+└── mysql-data volume (Data persists here)
+```
 ## Quick Reference
 
 ### Common Workflow
