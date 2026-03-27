@@ -1220,6 +1220,89 @@ Docker Compose is a tool for running **multiple containers** together. Instead o
 - One command to start everything
 - Easy to share your full application setup
 
+#### Simple docker-compose.yml Example
+
+Let's create a web app with nginx and a database:
+
+**docker-compose.yml:**
+```yaml
+version: '3.8'
+
+services:
+  # Web server
+  web:
+    image: nginx:1.25.3
+    container_name: my-nginx
+    ports:
+      - "8080:80"
+    volumes:
+      - ./index.html:/usr/share/nginx/html/index.html
+    networks:
+      - app-network
+
+  # Database
+  database:
+    image: mysql:8.0
+    container_name: my-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpass123
+      MYSQL_DATABASE: myapp_db
+      MYSQL_USER: appuser
+      MYSQL_PASSWORD: apppass123
+    volumes:
+      - mysql-data:/var/lib/mysql
+    networks:
+      - app-network
+
+# Define volumes
+volumes:
+  mysql-data:
+
+# Define networks
+networks:
+  app-network:
+```
+
+#### What Each Part Does:
+
+- **version: '3.8'** - Docker Compose file format version
+- **services:** - List of containers to run
+- **web:** - Name of our service
+- **image: nginx:1.25.3** - Use specific nginx version
+- **container_name:** - Custom name for the container
+- **ports:** - Map port 8080 on your computer to port 80 in container
+- **volumes:** - Share files between your computer and container
+- **environment:** - Set environment variables for the database
+- **networks:** - Connect services to the same network (so web can talk to database)
+- **volumes: mysql-data:** - Define named volume for database persistence
+
+---
+
+#### Docker Compose Commands
+
+**Start all services:**
+```bash
+docker-compose up
+```
+
+**Start in background:**
+```bash
+docker-compose up -d
+```
+
+**Stop and remove all services:**
+```bash
+docker-compose down
+```
+
+**View running services:**
+```bash
+docker-compose ps
+```
+
+---
+
+
 #### Complete Real-World Example: Node.js + MySQL
 
 Now let's build something real! A Node.js app that connects to a MySQL database. This is exactly what you'll do in real projects.
