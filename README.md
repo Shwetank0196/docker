@@ -1029,75 +1029,154 @@ docker exec -it mysql-db-new mysql -u root -pmypassword -e "SELECT * FROM testdb
 
 ### 4.3 Environment Variables
 
-#### What are Environment Variables?
+#### What Are Environment Variables?
 
-Variables that configure your container without changing the code.
+Think of environment variables as **settings** you pass to your container to control how it behaves.
 
-**Common uses:**
-- Database passwords
-- API keys
-- Configuration settings (production vs development)
+**Simple analogy:**
+- Your container is like a phone app
+- Environment variables are like the app settings (dark mode on/off, language, etc.)
+- You can change these settings without reinstalling the app
 
-#### Using Environment Variables
+**Why do we use them?**
+1. **No rebuilding needed** - Change database password without rebuilding image
+2. **Keep secrets safe** - Never hardcode passwords in your code
+3. **Same image, different configs** - Use one image for testing and production
+
+---
+
+#### How to Set Environment Variables
+
+There are **two main ways**:
+
+**Method 1:** Use `-e` flag (good for 1-3 variables)
+**Method 2:** Use `.env` file (good for many variables)
+
+Let's see both with examples!
+
+---
+
+#### Method 1: Using `-e` Flag
 
 **Simple example:**
 ```bash
-docker run -d -e MY_VAR=hello nginx
+docker run -d -e APP_NAME="My Shop" nginx
 ```
+
+This passes one variable `APP_NAME` with value `My Shop` into the container.
 
 **Multiple variables:**
 ```bash
 docker run -d \
-  -e MYSQL_ROOT_PASSWORD=secret123 \
-  -e MYSQL_DATABASE=myapp \
-  -e MYSQL_USER=john \
-  -e MYSQL_PASSWORD=pass456 \
-  mysql
+  -e DATABASE_HOST=localhost \
+  -e DATABASE_PORT=3306 \
+  -e DEBUG=true \
+  nginx
 ```
 
+Each `-e` adds one variable. The app inside the container can read these values.
+
+---
+
+#### Method 2: Using `.env` File
+
+When you have many variables, typing them all is annoying. Use a file instead!
+
+**Step 1: Create a file named `.env`**
+```env
+DATABASE_HOST=localhost
+DATABASE_PORT=3306
+API_KEY=secret123
+DEBUG=true
+```
+
+**Step 2: Use the file when running**
+```bash
+docker run -d --env-file .env nginx
+```
+
+**That's it!** All 4 variables are now inside the container.
+
+**⚠️ Important:** Add `.env` to `.gitignore` so you don't accidentally commit passwords to GitHub!
+
+---
+
 #### Real Example: MySQL Database
+
+Let's set up a MySQL database with environment variables. This is very common in real projects!
+
+**What MySQL needs:**
+- `MYSQL_ROOT_PASSWORD` - Admin password (required!)
+- `MYSQL_DATABASE` - Name of database to create
+- `MYSQL_USER` - Regular user to create
+- `MYSQL_PASSWORD` - Password for that user
+
+---
+
+**Example 1: Using `-e` flags**
 
 ```bash
 docker run -d \
   --name my-database \
-  -e MYSQL_ROOT_PASSWORD=rootpass \
+  -e MYSQL_ROOT_PASSWORD=admin123 \
   -e MYSQL_DATABASE=shop_db \
-  -e MYSQL_USER=shopuser \
-  -e MYSQL_PASSWORD=shoppass \
+  -e MYSQL_USER=john \
+  -e MYSQL_PASSWORD=john123 \
   -p 3306:3306 \
   mysql
 ```
 
-**What happens:**
-- MySQL creates a database called `shop_db`
-- Creates user `shopuser` with password `shoppass`
-- Sets root password to `rootpass`
+**What happens inside MySQL:**
+1. Root password set to `admin123` ✅
+2. Database `shop_db` created ✅
+3. User `john` created with password `john123` ✅
+4. User `john` can access `shop_db` ✅
 
-#### Using Environment Files
+**Test it works:**
+```bash
+# Connect as john
+docker exec -it my-database mysql -u john -pjohn123 shop_db
+```
 
-For many variables, use a file:
+You're now inside MySQL! Type `exit` to leave.
+
+---
+
+**Example 2: Using `.env` file (cleaner!)**
 
 **Create `.env` file:**
 ```env
-MYSQL_ROOT_PASSWORD=rootpass
+MYSQL_ROOT_PASSWORD=admin123
 MYSQL_DATABASE=shop_db
-MYSQL_USER=shopuser
-MYSQL_PASSWORD=shoppass
+MYSQL_USER=john
+MYSQL_PASSWORD=john123
 ```
 
-**Use it:**
+**Run MySQL:**
 ```bash
-docker run -d --name my-database --env-file .env mysql
+docker run -d \
+  --name my-database \
+  --env-file .env \
+  -p 3306:3306 \
+  mysql
 ```
 
-#### In Dockerfile
+**Same result, but cleaner!** Perfect for projects with many settings.
 
+---
+
+#### Setting Defaults in Dockerfile
+
+You can set **default values** in your Dockerfile. Users can override them later if needed.
+
+**Example Dockerfile:**
 ```dockerfile
 FROM node:18
 
-# Set default environment variable
+# Set default environment variables
 ENV NODE_ENV=production
 ENV PORT=3000
+ENV APP_NAME="My App"
 
 COPY . /app
 WORKDIR /app
@@ -1105,19 +1184,31 @@ WORKDIR /app
 CMD ["node", "server.js"]
 ```
 
-**Override when running:**
+**Build the image:**
 ```bash
-docker run -d -e NODE_ENV=development -e PORT=8080 my-node-app
+docker build -t my-node-app .
 ```
 
-**Key Points:**
-- Never hardcode passwords in Dockerfiles
-- Use `-e` for single variables
-- Use `--env-file` for multiple variables
-- Keep `.env` files out of version control (add to `.gitignore`)
+**Run with defaults:**
+```bash
+docker run -d my-node-app
+# Uses: NODE_ENV=production, PORT=3000
+```
+
+**Run with overrides:**
+```bash
+docker run -d \
+  -e NODE_ENV=development \
+  -e PORT=8080 \
+  my-node-app
+# Now uses: NODE_ENV=development, PORT=8080
+```
+
+**The key idea:**
+- Dockerfile = default settings
+- `-e` flag = override when you run
 
 ---
-
 ### 4.4 Docker Compose (IMPORTANT)
 
 #### What is Docker Compose?
